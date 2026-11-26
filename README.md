@@ -1,0 +1,1 @@
+# mineral-maps-guyana.1
