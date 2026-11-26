@@ -1,0 +1,19 @@
+{
+  "name": "mineral-maps-guyana",
+  "version": "0.4.0",
+  "private": true,
+  "description": "Mineral Maps Guyana - Android/Web GIS field application",
+  "scripts": {
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:run": "cap run android"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/android": "^8.0.0"
+  }
+}

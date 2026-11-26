@@ -1,0 +1,24 @@
+MINERAL MAPS GUYANA - COMPILACAO APK NA NUVEM
+Versao: 0.5.0
+
+ESTE PACOTE AINDA NAO E O APK. ELE CONTEM O PROJETO E UM WORKFLOW PARA GERAR O APK NA NUVEM, SEM PRECISAR DE COMPUTADOR LOCAL.
+
+COMO USAR PELO TELEFONE
+1. Crie ou entre na sua conta GitHub em https://github.com
+2. Crie um repositorio novo chamado mineral-maps-guyana (pode ser privado).
+3. Envie os arquivos e pastas DESTE ZIP para a raiz do repositorio. Extraia o ZIP no telefone antes de enviar, se o navegador permitir.
+4. Depois do envio, abra a aba Actions do repositorio.
+5. Se solicitado, habilite GitHub Actions.
+6. Escolha "Build Mineral Maps Guyana APK" e toque em "Run workflow".
+7. Quando terminar com sucesso, abra a execucao e baixe o artefato "mineral-maps-guyana-debug-apk".
+8. O download do artefato vem em ZIP. Extraia-o no telefone: dentro estara app-debug.apk.
+9. Toque no APK para instalar. Se o Android bloquear, permita temporariamente a instalacao pelo navegador/gerenciador de arquivos que fez o download.
+
+O WORKFLOW ESTA EM .github/workflows/build-apk.yml E COMPILA COM GITHUB ACTIONS (JAVA 21, NODE 22, CAPACITOR 8, GRADLE).
+
+SEGURANCA
+- Nao compartilhe senha da sua conta GitHub comigo nem com terceiros.
+- O APK gerado e uma compilacao de teste (debug), adequada para instalacao manual; nao e uma versao assinada para publicar na Play Store.
+
+MAPAS OFFLINE
+As camadas GIS guardadas/importadas podem ser usadas sem rede. Os mapas-base satelite/topografico ainda dependem de internet. Pacotes de mapas offline para Cuyuni-Mazaruni precisam ser adicionados separadamente, respeitando as licencas das fontes cartograficas.

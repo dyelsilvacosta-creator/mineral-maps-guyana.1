@@ -1,0 +1,9 @@
+{
+  "appId": "gy.mineralmaps.guyana",
+  "appName": "Mineral Maps Guyana",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
