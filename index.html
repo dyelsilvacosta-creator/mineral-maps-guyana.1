@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#102b25"><link rel="manifest" href="manifest.webmanifest">
+<title>Mineral Maps Guyana</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#0c1b18;--panel:#132a24;--line:#28483d;--text:#eef7f1;--muted:#a8beb2;--accent:#d8b45a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,Arial}
+header{padding:13px 16px;background:#102b25;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+h1{font-size:18px;margin:0}header small{color:var(--muted)}.pill{font-size:11px;border:1px solid #547365;border-radius:20px;padding:5px 9px;color:#c8e4d3}
+main{display:flex;flex-direction:column;height:calc(100dvh - 58px)}#map{flex:1;min-height:280px;background:#dce6df}
+.panel{background:var(--panel);padding:12px 14px;border-top:1px solid var(--line);max-height:48%;overflow:auto}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+button,.btn{background:#1e4035;color:var(--text);border:1px solid #426858;border-radius:10px;padding:10px 12px;font-weight:600}
+button.primary{background:var(--accent);color:#1b2119;border-color:var(--accent)}
+input[type=text]{min-width:0;flex:1;background:#0c1b18;border:1px solid #426858;border-radius:10px;padding:11px;color:white}
+.layers{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px}.layers label{display:flex;gap:5px;align-items:center}
+#status{font-size:12px;color:var(--muted);margin:8px 0}.result{padding:9px 0;border-top:1px solid var(--line);font-size:13px}
+.note{font-size:11px;color:var(--muted);line-height:1.45}.metric{display:inline-block;padding:7px 9px;background:#0c1b18;border:1px solid var(--line);border-radius:9px;margin:3px;font-size:12px}
+@media(min-width:850px){main{height:calc(100vh - 58px);display:grid;grid-template-columns:minmax(0,1fr) 390px}#map{height:100%}.panel{max-height:none;border-top:0;border-left:1px solid var(--line)}}
+</style></head><body>
+<header><div><h1>⛏ Mineral Maps Guyana</h1><small>Cuyuni · Mazaruni | versão 0.3</small></div><span class="pill">GPS • GIS • Offline</span></header>
+<main><div id="map"></div><section class="panel">
+<div class="controls"><button id="topo" class="primary">Mapa topográfico</button><button id="sat">Satélite</button></div>
+<div class="controls"><input id="search" type="text" placeholder="Buscar licença, processo ou requerente"><button id="find" class="primary">Buscar</button></div>
+<div class="controls"><button id="gps">◎ Minha localização</button><button id="home">Cuyuni–Mazaruni</button></div>
+<div class="layers">
+<label><input type="checkbox" id="lic" checked> Licenças</label><label><input type="checkbox" id="district" checked> Distritos</label>
+<label><input type="checkbox" id="reserved"> Reservadas</label><label><input type="checkbox" id="protected"> Protegidas</label>
+</div>
+<div id="status">Inicializando…</div>
+<div class="controls"><button id="measure">＋ Medir área</button><button id="clear">Limpar medição</button></div>
+<div><span class="metric" id="measureState">Medição desligada</span><span class="metric" id="measureValue">0 ha</span></div>
+<div class="controls" style="margin-top:10px"><button id="save">Guardar dados GIS</button><button id="export">Exportar GeoJSON</button></div>
+<div class="controls"><label class="btn" for="import">Importar GeoJSON</label><input id="import" type="file" accept=".geojson,.json" hidden></div>
+<div id="results"></div>
+<p class="note">Mapas-base: alterna entre topográfico e satélite; ambos precisam de internet. Offline: camadas GIS carregadas podem ser guardadas neste aparelho e reabertas sem internet. Esta versão ainda não inclui pacote de mapa-base offline nem descarregamento de tiles. O GPS requer permissão e HTTPS. Áreas e licenças são indicativas; confirme limites e situação legal com a GGMC.</p>
+</section></main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<script>
+const ROOT='https://services8.arcgis.com/8tX9OH8doNBidChm/ArcGIS/rest/services/Mineral_Property_Data_For_Download_WFL1/FeatureServer';
+const map=L.map('map').setView([6.2,-59.2],8);
+const topo=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri — Sources: Esri, HERE, Garmin, Intermap, increment P Corp., GEBCO, USGS, FAO, NPS, NRCAN, GeoBase, IGN, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), (c) OpenStreetMap contributors, and the GIS User Community'});
+const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community'});
+let activeBase=topo.addTo(map);
+function setBase(which){if(activeBase)map.removeLayer(activeBase);activeBase=which;activeBase.addTo(map);$('topo').classList.toggle('primary',which===topo);$('sat').classList.toggle('primary',which===satellite);}
+let layers={},cache={},measureOn=false,points=[],measureLine=null,measurePoly=null,imported=null;
+const $=id=>document.getElementById(id), say=s=>$('status').textContent=s;
+function featurePopup(f){const p=f.properties||{};return `<b>${p.File_NO||p.File_No||p.area_name||p.MINING_DIS||'Registro mineral'}</b><br>${p.Applicant||p.applicant||p.area_type||''}<br>${p.Permit_Typ||p.permit_type||''}<br>${p.Status||p.status||''}`;}
+async function getLayer(id,key,color){try{
+ let data=cache[key];if(!data){const url=`${ROOT}/${id}/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=geojson&resultRecordCount=2000`;const r=await fetch(url);if(!r.ok)throw Error('HTTP '+r.status);data=await r.json();cache[key]=data;}
+ if(layers[key])map.removeLayer(layers[key]);layers[key]=L.geoJSON(data,{style:{color,weight:1.5,fillOpacity:.08},onEachFeature:(f,l)=>l.bindPopup(featurePopup(f))});
+ if($(key).checked)layers[key].addTo(map);return data.features?.length||0;
+ }catch(e){say('Falha em '+key+': '+e.message);return 0}}
+async function init(){try{const saved=localStorage.getItem('mmg-v2-data');if(saved)cache=JSON.parse(saved);}catch(e){}
+ say('Consultando serviço GIS…');const lic=await getLayer(17,'lic','#d8a63d');const dis=await getLayer(11,'district','#8c79d5');await getLayer(8,'reserved','#cf6464');await getLayer(4,'protected','#4ca99e');say(`Pronto. Licenças: ${lic} | Distritos: ${dis}.`);}
+[['lic','lic'],['district','district'],['reserved','reserved'],['protected','protected']].forEach(([id,k])=>$(id).onchange=e=>{if(!layers[k])return;e.target.checked?layers[k].addTo(map):map.removeLayer(layers[k]);});
+$('topo').onclick=()=>setBase(topo);$('sat').onclick=()=>setBase(satellite);
+$('home').onclick=()=>map.setView([6.2,-59.2],8);
+$('gps').onclick=()=>{if(!navigator.geolocation)return say('GPS não disponível.');navigator.geolocation.getCurrentPosition(p=>{let ll=[p.coords.latitude,p.coords.longitude];map.setView(ll,16);L.marker(ll).addTo(map).bindPopup('Localização GPS').openPopup();},e=>say('GPS: '+e.message),{enableHighAccuracy:true});};
+$('save').onclick=()=>{try{localStorage.setItem('mmg-v2-data',JSON.stringify(cache));say('Dados GIS guardados neste dispositivo.');}catch(e){say('Sem espaço local suficiente. Exporte os dados e reduza a área consultada.');}};
+$('find').onclick=()=>{let q=$('search').value.trim().toLowerCase(),out=$('results');out.innerHTML='';if(!q)return out.textContent='Digite um termo para pesquisar.';let n=0;Object.entries(layers).forEach(([k,g])=>{if(!$(k).checked)return;g.eachLayer(l=>{if(JSON.stringify(l.feature.properties||{}).toLowerCase().includes(q)&&n<40){let d=document.createElement('div');d.className='result';d.textContent=featurePopupText(l.feature);d.onclick=()=>{map.fitBounds(l.getBounds());l.openPopup();};out.appendChild(d);n++;}})});if(!n)out.textContent='Nenhum registro encontrado nas camadas carregadas.';};
+function featurePopupText(f){let p=f.properties||{};return [p.File_NO||p.File_No||p.area_name||'Registro',p.Applicant||p.applicant||'',p.Permit_Typ||p.permit_type||''].filter(Boolean).join(' · ');}
+$('measure').onclick=()=>{measureOn=!measureOn;$('measureState').textContent=measureOn?'Toque no mapa para adicionar pontos':'Medição desligada';};
+$('clear').onclick=()=>{points=[];if(measureLine)map.removeLayer(measureLine);if(measurePoly)map.removeLayer(measurePoly);measureLine=measurePoly=null;$('measureValue').textContent='0 ha';$('measureState').textContent='Medição desligada';measureOn=false;};
+map.on('click',e=>{if(!measureOn)return;points.push([e.latlng.lng,e.latlng.lat]);if(measureLine)map.removeLayer(measureLine);if(measurePoly)map.removeLayer(measurePoly);if(points.length>1)measureLine=L.polyline(points.map(p=>[p[1],p[0]]),{color:'#f0c75e'}).addTo(map);if(points.length>2){measurePoly=L.polygon(points.map(p=>[p[1],p[0]]),{color:'#f0c75e',fillOpacity:.18}).addTo(map);let ring=[...points,points[0]],area=turf.area(turf.polygon([ring]));$('measureValue').textContent=(area/10000).toFixed(2)+' ha · '+(area/4046.856).toFixed(2)+' acres';}});
+$('export').onclick=()=>{let fc={type:'FeatureCollection',features:Object.values(cache).flatMap(x=>x.features||[])};if(imported)fc.features.push(...(imported.features||[]));let blob=new Blob([JSON.stringify(fc)],{type:'application/geo+json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mineral-maps-guyana.geojson';a.click();URL.revokeObjectURL(a.href);};
+$('import').onchange=async e=>{let f=e.target.files[0];if(!f)return;try{imported=JSON.parse(await f.text());L.geoJSON(imported,{style:{color:'#fff',weight:2}}).addTo(map);say('GeoJSON importado.');}catch(err){say('Arquivo GeoJSON inválido.');}};
+init();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script></body></html>
